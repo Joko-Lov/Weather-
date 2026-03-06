@@ -2,49 +2,90 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SkyFetch Weather Dashboard</title>
 
 <style>
 body{
-font-family: Arial, sans-serif;
-background: linear-gradient(135deg,#46325c,#778091);
-height:100vh;
-display:flex;
-justify-content:center;
-align-items:center;
-color:white;
-text-align:center;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg,#4facfe,#00f2fe);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    margin:0;
 }
 
 .container{
-background:white;
-color:black;
-padding:30px;
-border-radius:12px;
-box-shadow:0 10px 25px rgba(0,0,0,0.2);
-width:300px;
+    background:white;
+    padding:30px;
+    border-radius:12px;
+    text-align:center;
+    width:350px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.2);
 }
 
 h1{
-margin-bottom:20px;
+    margin-bottom:20px;
 }
 
-#weather img{
-width:80px;
+.search{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
 }
 
-button{
-margin-top:15px;
-padding:10px 15px;
-border:none;
-background:#2575fc;
-color:white;
-border-radius:5px;
-cursor:pointer;
+#cityInput{
+    flex:1;
+    padding:10px;
+    border:1px solid #ccc;
+    border-radius:6px;
+    outline:none;
 }
 
-button:hover{
-background:#1b5ed6;
+#cityInput:focus{
+    border-color:#4facfe;
+}
+
+#searchBtn{
+    padding:10px 15px;
+    border:none;
+    background:#4facfe;
+    color:white;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+#searchBtn:hover{
+    background:#2e8de6;
+}
+
+.weather{
+    margin-top:15px;
+}
+
+.loading{
+    margin-top:20px;
+}
+
+.spinner{
+    width:40px;
+    height:40px;
+    border:4px solid #ccc;
+    border-top:4px solid #4facfe;
+    border-radius:50%;
+    animation:spin 1s linear infinite;
+    margin:auto;
+}
+
+@keyframes spin{
+    0%{transform:rotate(0deg);}
+    100%{transform:rotate(360deg);}
+}
+
+.error{
+    color:red;
+    margin-top:10px;
 }
 </style>
 </head>
@@ -53,16 +94,21 @@ background:#1b5ed6;
 
 <div class="container">
 
-<h1>SkyFetch</h1>
+<h1>SkyFetch 🌤</h1>
 
-<div id="weather">
-<h2 id="city"></h2>
-<p id="temp"></p>
-<p id="description"></p>
-<img id="icon"/>
+<div class="search">
+<input type="text" id="cityInput" placeholder="Enter city name">
+<button id="searchBtn">Search</button>
 </div>
 
-<button onclick="getWeather('London')">Refresh</button>
+<div id="weather"></div>
+
+<div id="loading" class="loading" style="display:none;">
+<div class="spinner"></div>
+<p>Loading weather...</p>
+</div>
+
+<div id="error" class="error"></div>
 
 </div>
 
@@ -72,39 +118,84 @@ background:#1b5ed6;
 
 const API_KEY = "eefabd6d53f7a6a62153882981023c67";
 
-function getWeather(city){
+const cityInput = document.getElementById("cityInput");
+const searchBtn = document.getElementById("searchBtn");
+const weatherDiv = document.getElementById("weather");
+const loadingDiv = document.getElementById("loading");
+const errorDiv = document.getElementById("error");
 
-const url =
-`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`;
-
-axios.get(url)
-
-.then(function(response){
-
-const data = response.data;
-
-document.getElementById("city").textContent = data.name;
-
-document.getElementById("temp").textContent =
-"Temperature: " + data.main.temp + "°C";
-
-document.getElementById("description").textContent =
-data.weather[0].description;
-
-const icon =
-`https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`;
-
-document.getElementById("icon").src = icon;
-
-})
-
-.catch(function(error){
-console.log("Error fetching weather:", error);
-});
-
+function showLoading(){
+    loadingDiv.style.display="block";
+    weatherDiv.innerHTML="";
+    errorDiv.innerHTML="";
 }
 
-getWeather("London");
+function hideLoading(){
+    loadingDiv.style.display="none";
+}
+
+function showError(message){
+    errorDiv.innerHTML = message;
+    weatherDiv.innerHTML="";
+}
+
+function displayWeather(data){
+
+    const html = `
+        <h2>${data.name}</h2>
+        <p><b>Temperature:</b> ${data.main.temp}°C</p>
+        <p><b>Weather:</b> ${data.weather[0].description}</p>
+        <p><b>Humidity:</b> ${data.main.humidity}%</p>
+        <p><b>Wind Speed:</b> ${data.wind.speed} m/s</p>
+    `;
+
+    weatherDiv.innerHTML = html;
+}
+
+async function getWeather(city){
+
+    try{
+
+        showLoading();
+        searchBtn.disabled = true;
+
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`;
+
+        const response = await axios.get(url);
+
+        hideLoading();
+        displayWeather(response.data);
+
+    }
+    catch(error){
+
+        hideLoading();
+        showError("City not found. Please enter a valid city.");
+
+    }
+    finally{
+        searchBtn.disabled = false;
+    }
+}
+
+searchBtn.addEventListener("click", ()=>{
+
+    const city = cityInput.value.trim();
+
+    if(city === ""){
+        showError("Please enter a city name");
+        return;
+    }
+
+    getWeather(city);
+    cityInput.value="";
+});
+
+cityInput.addEventListener("keypress",(event)=>{
+    if(event.key==="Enter"){
+        searchBtn.click();
+    }
+});
 
 </script>
 
