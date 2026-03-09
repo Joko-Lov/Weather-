@@ -2,91 +2,112 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SkyFetch Weather Dashboard</title>
 
 <style>
+
 body{
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg,#4facfe,#00f2fe);
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    margin:0;
+font-family: Arial, sans-serif;
+background: linear-gradient(135deg,#4facfe,#00f2fe);
+margin:0;
+padding:0;
+display:flex;
+justify-content:center;
+align-items:flex-start;
+min-height:100vh;
 }
 
 .container{
-    background:white;
-    padding:30px;
-    border-radius:12px;
-    text-align:center;
-    width:350px;
-    box-shadow:0 8px 20px rgba(0,0,0,0.2);
+background:white;
+margin-top:40px;
+padding:25px;
+border-radius:10px;
+width:500px;
+box-shadow:0 10px 20px rgba(0,0,0,0.2);
 }
 
 h1{
-    margin-bottom:20px;
+text-align:center;
+margin-bottom:20px;
 }
 
-.search{
-    display:flex;
-    gap:10px;
-    margin-bottom:20px;
+.search-box{
+display:flex;
+gap:10px;
+margin-bottom:20px;
 }
 
-#cityInput{
-    flex:1;
-    padding:10px;
-    border:1px solid #ccc;
-    border-radius:6px;
-    outline:none;
+.search-box input{
+flex:1;
+padding:10px;
+border-radius:6px;
+border:1px solid #ccc;
 }
 
-#cityInput:focus{
-    border-color:#4facfe;
+.search-box button{
+padding:10px 15px;
+border:none;
+background:#4facfe;
+color:white;
+border-radius:6px;
+cursor:pointer;
 }
 
-#searchBtn{
-    padding:10px 15px;
-    border:none;
-    background:#4facfe;
-    color:white;
-    border-radius:6px;
-    cursor:pointer;
+.search-box button:hover{
+background:#3a8ce0;
 }
 
-#searchBtn:hover{
-    background:#2e8de6;
+.recent{
+margin-bottom:15px;
+}
+
+.recent button{
+margin:5px;
+padding:6px 10px;
+border:none;
+background:#eee;
+border-radius:5px;
+cursor:pointer;
+}
+
+.recent button:hover{
+background:#ddd;
 }
 
 .weather{
-    margin-top:15px;
+text-align:center;
+margin-top:10px;
 }
 
-.loading{
-    margin-top:20px;
+.weather img{
+width:70px;
 }
 
-.spinner{
-    width:40px;
-    height:40px;
-    border:4px solid #ccc;
-    border-top:4px solid #4facfe;
-    border-radius:50%;
-    animation:spin 1s linear infinite;
-    margin:auto;
+.forecast{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:10px;
+margin-top:20px;
 }
 
-@keyframes spin{
-    0%{transform:rotate(0deg);}
-    100%{transform:rotate(360deg);}
+.card{
+background:#f5f5f5;
+padding:10px;
+border-radius:8px;
+text-align:center;
+font-size:14px;
 }
 
-.error{
-    color:red;
-    margin-top:10px;
+.clear-btn{
+margin-top:10px;
+padding:6px 10px;
+background:#ff5c5c;
+color:white;
+border:none;
+border-radius:5px;
+cursor:pointer;
 }
+
 </style>
 </head>
 
@@ -94,108 +115,207 @@ h1{
 
 <div class="container">
 
-<h1>SkyFetch 🌤</h1>
+<h1>SkyFetch Weather</h1>
 
-<div class="search">
-<input type="text" id="cityInput" placeholder="Enter city name">
+<div class="search-box">
+<input id="cityInput" placeholder="Enter city name">
 <button id="searchBtn">Search</button>
 </div>
 
-<div id="weather"></div>
-
-<div id="loading" class="loading" style="display:none;">
-<div class="spinner"></div>
-<p>Loading weather...</p>
+<div class="recent">
+<strong>Recent Searches:</strong>
+<div id="recentContainer"></div>
+<button class="clear-btn" id="clearBtn">Clear History</button>
 </div>
 
-<div id="error" class="error"></div>
+<div class="weather" id="weather"></div>
+
+<div class="forecast" id="forecast"></div>
 
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
 <script>
 
-const API_KEY = "eefabd6d53f7a6a62153882981023c67";
+class WeatherApp{
 
-const cityInput = document.getElementById("cityInput");
-const searchBtn = document.getElementById("searchBtn");
-const weatherDiv = document.getElementById("weather");
-const loadingDiv = document.getElementById("loading");
-const errorDiv = document.getElementById("error");
+constructor(){
 
-function showLoading(){
-    loadingDiv.style.display="block";
-    weatherDiv.innerHTML="";
-    errorDiv.innerHTML="";
+this.apiKey="eefabd6d53f7a6a62153882981023c67";
+
+this.cityInput=document.getElementById("cityInput");
+this.searchBtn=document.getElementById("searchBtn");
+
+this.weatherDiv=document.getElementById("weather");
+this.forecastDiv=document.getElementById("forecast");
+
+this.recentContainer=document.getElementById("recentContainer");
+this.clearBtn=document.getElementById("clearBtn");
+
+this.recentSearches=[];
+
+this.init();
 }
 
-function hideLoading(){
-    loadingDiv.style.display="none";
+init(){
+
+this.searchBtn.addEventListener("click",()=>{
+let city=this.cityInput.value.trim();
+if(city){
+this.getWeather(city);
 }
-
-function showError(message){
-    errorDiv.innerHTML = message;
-    weatherDiv.innerHTML="";
-}
-
-function displayWeather(data){
-
-    const html = `
-        <h2>${data.name}</h2>
-        <p><b>Temperature:</b> ${data.main.temp}°C</p>
-        <p><b>Weather:</b> ${data.weather[0].description}</p>
-        <p><b>Humidity:</b> ${data.main.humidity}%</p>
-        <p><b>Wind Speed:</b> ${data.wind.speed} m/s</p>
-    `;
-
-    weatherDiv.innerHTML = html;
-}
-
-async function getWeather(city){
-
-    try{
-
-        showLoading();
-        searchBtn.disabled = true;
-
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`;
-
-        const response = await axios.get(url);
-
-        hideLoading();
-        displayWeather(response.data);
-
-    }
-    catch(error){
-
-        hideLoading();
-        showError("City not found. Please enter a valid city.");
-
-    }
-    finally{
-        searchBtn.disabled = false;
-    }
-}
-
-searchBtn.addEventListener("click", ()=>{
-
-    const city = cityInput.value.trim();
-
-    if(city === ""){
-        showError("Please enter a city name");
-        return;
-    }
-
-    getWeather(city);
-    cityInput.value="";
 });
 
-cityInput.addEventListener("keypress",(event)=>{
-    if(event.key==="Enter"){
-        searchBtn.click();
-    }
+this.clearBtn.addEventListener("click",()=>this.clearHistory());
+
+this.loadRecentSearches();
+this.loadLastCity();
+}
+
+async getWeather(city){
+
+try{
+
+this.weatherDiv.innerHTML="Loading...";
+
+const weatherRes=await fetch(
+`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${this.apiKey}`
+);
+
+const weatherData=await weatherRes.json();
+
+if(weatherData.cod!==200){
+this.weatherDiv.innerHTML="City not found";
+return;
+}
+
+const forecastRes=await fetch(
+`https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&appid=${this.apiKey}`
+);
+
+const forecastData=await forecastRes.json();
+
+this.displayWeather(weatherData);
+this.displayForecast(forecastData);
+
+this.saveRecentSearch(city);
+localStorage.setItem("lastCity",city);
+
+}catch(err){
+
+this.weatherDiv.innerHTML="Error loading weather";
+
+}
+
+}
+
+displayWeather(data){
+
+this.weatherDiv.innerHTML=`
+<h2>${data.name}</h2>
+<img src="https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png">
+<h3>${Math.round(data.main.temp)}°C</h3>
+<p>${data.weather[0].description}</p>
+`;
+
+}
+
+displayForecast(data){
+
+this.forecastDiv.innerHTML="";
+
+let list=data.list.filter(item=>item.dt_txt.includes("12:00:00"));
+
+list.slice(0,5).forEach(day=>{
+
+let card=document.createElement("div");
+
+card.className="card";
+
+let date=new Date(day.dt_txt).toDateString().slice(0,10);
+
+card.innerHTML=`
+<p>${date}</p>
+<img src="https://openweathermap.org/img/wn/${day.weather[0].icon}.png">
+<p>${Math.round(day.main.temp)}°C</p>
+`;
+
+this.forecastDiv.appendChild(card);
+
 });
+
+}
+
+saveRecentSearch(city){
+
+city=city.charAt(0).toUpperCase()+city.slice(1).toLowerCase();
+
+this.recentSearches=this.recentSearches.filter(c=>c!==city);
+
+this.recentSearches.unshift(city);
+
+if(this.recentSearches.length>5){
+this.recentSearches.pop();
+}
+
+localStorage.setItem("recentSearches",JSON.stringify(this.recentSearches));
+
+this.displayRecentSearches();
+
+}
+
+loadRecentSearches(){
+
+let saved=localStorage.getItem("recentSearches");
+
+if(saved){
+this.recentSearches=JSON.parse(saved);
+}
+
+this.displayRecentSearches();
+
+}
+
+displayRecentSearches(){
+
+this.recentContainer.innerHTML="";
+
+this.recentSearches.forEach(city=>{
+
+let btn=document.createElement("button");
+
+btn.textContent=city;
+
+btn.addEventListener("click",()=>{
+this.getWeather(city);
+});
+
+this.recentContainer.appendChild(btn);
+
+});
+
+}
+
+loadLastCity(){
+
+let last=localStorage.getItem("lastCity");
+
+if(last){
+this.getWeather(last);
+}
+
+}
+
+clearHistory(){
+
+localStorage.removeItem("recentSearches");
+this.recentSearches=[];
+this.displayRecentSearches();
+
+}
+
+}
+
+new WeatherApp();
 
 </script>
 
